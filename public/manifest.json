@@ -1,25 +1,26 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Switch WebRTC",
+  "name": "Switch WebRTC",
   "icons": [
     {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "src": "nintendo-switch64.png",
+      "sizes": "64x64",
+      "type": "image/png"
     },
     {
-      "src": "logo192.png",
+      "src": "nintendo-switch256.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "256x256"
     },
     {
-      "src": "logo512.png",
+      "src": "nintendo-switch512.png",
       "type": "image/png",
       "sizes": "512x512"
     }
   ],
   "start_url": ".",
-  "display": "standalone",
+  "display": "fullscreen",
   "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "background_color": "#ffffff",
+  "orientation": "landscape"
 }

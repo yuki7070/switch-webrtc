@@ -4,10 +4,16 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+import { ChakraProvider } from '@chakra-ui/react';
+import { WebRTCProvider } from './lib/webrtc';
+
+
 ReactDOM.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+    <ChakraProvider>
+      <WebRTCProvider options={{ codec: 'VP9' }}>
+        <App />
+      </WebRTCProvider>
+    </ChakraProvider>,
   document.getElementById('root')
 );
 
