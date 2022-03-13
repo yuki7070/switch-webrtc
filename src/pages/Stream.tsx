@@ -4,6 +4,7 @@ import { useWebRTC } from '../lib/webrtc';
 import { Layout } from '../commponents/Layout';
 import { ControlBar } from '../commponents/ControlBar';
 import { MobileGamepad } from '../commponents/MobileGamepad';
+import { GamepadModal } from '../commponents/GamepadModal';
 
 export function Stream() {
   const remoteVideo = useRef<HTMLVideoElement>(null);
@@ -20,7 +21,6 @@ export function Stream() {
     createdIceCandidate,
     hasReceivedSdp,
     mediaStream,
-    dataChannel,
     clearPeerConnection,
   } = useWebRTC();
 
@@ -106,16 +106,6 @@ export function Stream() {
     dataChannel.send(new TextEncoder().encode(txt));
   }
 */
-  const sendBytesToDataChannel = (buf: ArrayBuffer) => {
-    if (buf.byteLength === 0) return;
-    if (dataChannel == null || dataChannel.readyState !== "open") {
-      console.log(dataChannel);
-      console.log(buf);
-      return;
-    }
-    dataChannel.send(buf);
-  }
-
   useEffect(() => {
     if (!mediaStream) return;
     if (!remoteVideo.current) return;
@@ -134,85 +124,7 @@ export function Stream() {
   }, []);
 
   const [isShowGamepad, setIsShowGamepad] = useState<boolean>(true)
-
-  //gamepad
-  const [joyConGamePad, setJoyConGamePad] = useState<number | undefined>(undefined)
-  useEffect(() => {
-    let joyConGamePadLoopID = 0;
-
-    if (dataChannel == null || dataChannel.readyState === 'closed') {
-      cancelAnimationFrame(joyConGamePadLoopID)
-      return;
-    }
-    
-    window.addEventListener('gamepadconnected', (e) => {
-      console.log(e.gamepad)
-      if (e.gamepad.id !== 'Joy-Con L+R (STANDARD GAMEPAD Vendor: 057e Product: 200e)' && 
-        e.gamepad.id !== 'Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)') {
-        return;
-      }
-      if (joyConGamePad !== undefined) return;
-      const gpIndex = e.gamepad.index;
-      setJoyConGamePad(e.gamepad.index);
-
-      const frameTime = 1/60;
-
-      let prevTimestamp = 0;
-      
-      const loop = (timestamp: number) => {
-        const elapsed = (timestamp - prevTimestamp) / 1000;
-        if (elapsed <= frameTime) {
-          joyConGamePadLoopID = requestAnimationFrame(loop);
-          return;
-        }
-
-        prevTimestamp = timestamp;
-
-        const gamepads = navigator.getGamepads();
-        const gp = gamepads[gpIndex];
-        if (!gp) return;
-
-        let key = 0x800000;
-        for (let i = 0; i < gp.buttons.length; i++) {
-          const b = gp.buttons[i];
-          key = key | (Number(b.pressed) << (23 - i - 1));
-        }
-        key = key & 0xffffff
-
-        const lx = gp.axes[0];
-        const ly = gp.axes[1];
-        const ls = (((Math.round(Math.abs(lx) * 7) & 0b0111)
-            | (Number(Math.sign(lx) === 1) << 3)) << 4)
-          | ((Math.round(Math.abs(ly) * 7) & 0b0111)
-            | (Number(Math.sign(ly) === 1) << 3));
-        
-        const rx = gp.axes[2];
-        const ry = gp.axes[3];
-        const rs = (((Math.round(Math.abs(rx) * 7) & 0b0111)
-          | (Number(Math.sign(rx) === 1) << 3)) << 4)
-          | ((Math.round(Math.abs(ry) * 7) & 0b0111)
-            | (Number(Math.sign(ry) === 1) << 3))
-
-        sendBytesToDataChannel(
-          new Uint8Array([key >> 16, key >> 8, key & 0xff, ls, rs])
-        )
-        joyConGamePadLoopID = requestAnimationFrame(loop);
-      }
-
-      joyConGamePadLoopID = requestAnimationFrame(loop);
-    })
-
-    window.addEventListener('gamepaddisconnected', () => {
-      setJoyConGamePad(0);
-      cancelAnimationFrame(joyConGamePadLoopID)
-    })
-
-    return () => {
-      cancelAnimationFrame(joyConGamePadLoopID)
-    }
-  }, [dataChannel])
-
-  
+  const [showGanpadModal, setShowGanpadModal] = useState<boolean>(false)
 
   return (
     <Layout>
@@ -236,7 +148,10 @@ export function Stream() {
             position: 'relative'
           }}
         >
-          <ControlBar setIsShowGamepad={setIsShowGamepad}/>
+          <ControlBar
+            setIsShowGamepad={setIsShowGamepad}
+            setShowGanpadModal={setShowGanpadModal}
+          />
           {isShowGamepad &&
             navigator.userAgent.match(/iPhone|Android.+Mobile/) && (
             <MobileGamepad />
@@ -255,6 +170,10 @@ export function Stream() {
           </video>
         </div>
       </div>
+      <GamepadModal
+        showGanpadModal={showGanpadModal}
+        setShowGanpadModal={setShowGanpadModal}
+      />
     </Layout>
   );
 }

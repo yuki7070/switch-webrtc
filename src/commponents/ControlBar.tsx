@@ -4,7 +4,8 @@ import { MdClose, MdSettings, MdVideogameAsset, MdTouchApp } from 'react-icons/m
 import { useHistory } from 'react-router-dom';
 
 export function ControlBar(props: {
-  setIsShowGamepad: (func: (value: boolean) => boolean) => void
+  setIsShowGamepad: (func: (value: boolean) => boolean) => void,
+  setShowGanpadModal: (func: (value: boolean) => boolean) => void
 }) {
   const [isShowControl, setIsShowControl] = useState<boolean>(false)
   const history = useHistory();
@@ -64,6 +65,7 @@ export function ControlBar(props: {
               icon={<MdVideogameAsset />}
               onClick={(e) => {
                 setIsShowControl(false);
+                props.setShowGanpadModal((prev: boolean) => !prev);
                 console.log('call setting');
                 e.stopPropagation();
               }}

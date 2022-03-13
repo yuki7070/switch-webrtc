@@ -27,7 +27,7 @@ export type WebRTCHook = {
 }
 
 export const DEFAULT_OPTIONS: Options = {
-  codec: 'VP9'
+  codec: 'H264'
 }
 
 const WebRTCContext = React.createContext<WebRTCHook | undefined>(undefined)
