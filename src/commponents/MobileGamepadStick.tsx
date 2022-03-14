@@ -1,31 +1,25 @@
 import { useEffect, useRef } from 'react';
 import { useWebRTC } from '../lib/webrtc';
 import createJs from 'createjs-module'
-import Hammer from "hammerjs";
 import { throttle } from "lodash";
 
 export function MobileGamepadStick(
   { keyCode }: { keyCode: number }
 ) {
-  const joystick = useRef<HTMLCanvasElement>(null)
+  const joystick = useRef<HTMLCanvasElement>(null!);
+  const canMove = useRef<boolean>(null!);
+  const stage = useRef<createJs.Stage>(null!);
+  const psp = useRef<createJs.Shape>(null!);
+  const center = useRef<{ x: number, y: number}>(null!);
+  const touchStartPos = useRef<{ x: number, y: number}>(null!);
 
   const {
     dataChannel,
   } = useWebRTC();
 
   useEffect(() => {
-    if (dataChannel == null) return;
-
-    const init = () => {
-      if (joystick.current)
-        initJoyStick(joystick.current);
-    }
-
-    dataChannel.addEventListener('open', init)
-
-    return dataChannel.removeEventListener('onopen', init)
-
-  }, [dataChannel])
+    initJoyStick(joystick.current);
+  }, [])
 
   const sendBytesToDataChannel = (buf: ArrayBuffer) => {
     if (buf.byteLength === 0) return;
@@ -39,76 +33,37 @@ export function MobileGamepadStick(
 
   const initJoyStick = (el: HTMLCanvasElement) => {
     console.log('init joystick')
-    let xCenter = 50;
-    let yCenter = 50;
-    const stage = new createJs.Stage(el);
+    center.current = { x: 50, y: 50 };
+    stage.current = new createJs.Stage(el);
     
-    const psp = new createJs.Shape();
-    psp.graphics.beginFill('#fff').drawCircle(xCenter, yCenter, 30);
-    psp.alpha = 0.5;
+    psp.current = new createJs.Shape();
+    psp.current.graphics.beginFill('#fff').drawCircle(
+      center.current.x, center.current.y, 30);
+    psp.current.alpha = 0.5;
 
-    stage.addChild(psp);
+    stage.current.addChild(psp.current);
 
     createJs.Ticker.framerate = 30;
-    createJs.Ticker.addEventListener('tick', stage);
-    stage.update();
+    createJs.Ticker.addEventListener('tick', stage.current);
+    stage.current.update();
 
-    const mc = new Hammer(el);
+    center.current = { x: el.clientTop, y: el.clientLeft };
+    psp.current.alpha = 0.5;
 
-    const pos = {
-      top: el.clientTop,
-      left: el.clientLeft
-    }
-    xCenter = pos.top;
-    yCenter = pos.left;
-    psp.alpha = 0.5;
+    stage.current.update();
 
-    stage.update();
+    canMove.current = false;
 
-    let canmove = false;
-
-    mc.on("panstart", (ev) => {
-      canmove = true;
-      sendBytesToDataChannel(new Uint8Array([0x30 | (0x0f & keyCode) ]))
-    })
-
-    mc.on("panmove", throttle((ev) => {
-      if (!canmove) return;
-      const coords = calculateCoords(ev.angle, ev.distance);
-
-      psp.x = coords.x;
-      psp.y = coords.y;
-
-      psp.alpha = 0.5;
-      
-      stage.update();
-
-      const x = Math.round(Math.min(Math.abs(coords.x), 60) / 60 * 7);
-      const y = Math.round(Math.min(Math.abs(coords.y), 60) / 60 * 7);
-
-      const val = ((((Number(Math.sign(coords.x) === 1) << 3) | Math.abs(x)) & 0b1111) << 4)
-        | (((Number(Math.sign(coords.y) === 1) << 3) | Math.abs(y)) & 0b1111);
-
-      sendBytesToDataChannel(new Uint8Array([0x40 | (0x0f & keyCode), val ]))
-    }, 33));
-    
-
-    mc.on("panend", (ev) => {
-      canmove = false;
-      psp.alpha = 0.25;
-      createJs.Tween.get(psp).to(
-        { x: xCenter, y: yCenter },
-        750,
-        createJs.Ease.elasticOut
-      );
-      sendBytesToDataChannel(new Uint8Array([0x50 | (0x0f & keyCode) ]))
-    });
   }
 
-  const calculateCoords = (angle: number, distance: number) => {
+  const calculateCoords = (ev: React.Touch) => {
+    const x = ev.clientX - touchStartPos.current.x;
+    const y = ev.clientY - touchStartPos.current.y;
+    let distance = Math.sqrt(x**2+y**2);
+
     var coords: any = {};
-    distance = Math.min(distance, 100);
-    var rads = (angle * Math.PI) / 180.0;
+    distance = Math.min(distance, 50);
+    var rads = Math.atan2(y, x);
 
     coords.x = distance * Math.cos(rads);
     coords.y = distance * Math.sin(rads);
@@ -116,9 +71,52 @@ export function MobileGamepadStick(
     return coords;
   }
 
+  const onTouchStartHandler = (ev: React.TouchEvent<HTMLCanvasElement>) => {
+    canMove.current = true;
+    touchStartPos.current = {
+      x: ev.targetTouches[0].clientX,
+      y: ev.targetTouches[0].clientY,
+    };
+    sendBytesToDataChannel(new Uint8Array([0x30 | (0x0f & keyCode) ]))
+  }
+
+  const onTouchMoveHandler = throttle((ev: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!canMove.current) return;
+    const coords = calculateCoords(ev.targetTouches[0]);
+
+    psp.current.x = coords.x;
+    psp.current.y = coords.y;
+
+    psp.current.alpha = 0.5;
+      
+    stage.current.update();
+
+    const x = Math.round(Math.abs(coords.x) / 50 * 7);
+    const y = Math.round(Math.abs(coords.y) / 50 * 7);
+
+    const val = ((((Number(Math.sign(coords.x) === 1) << 3) | Math.abs(x)) & 0b1111) << 4)
+      | (((Number(Math.sign(coords.y) === 1) << 3) | Math.abs(y)) & 0b1111);
+
+    sendBytesToDataChannel(new Uint8Array([0x40 | (0x0f & keyCode), val ]))
+  }, 33)
+
+  const onTouchEndHandler = () => {
+    canMove.current = false;
+    psp.current.alpha = 0.25;
+    createJs.Tween.get(psp.current).to(
+      center.current,
+      750,
+      createJs.Ease.elasticOut
+    );
+    sendBytesToDataChannel(new Uint8Array([0x50 | (0x0f & keyCode) ]))
+  }
+
   return (
     <canvas
       ref={joystick}
+      onTouchStart={onTouchStartHandler}
+      onTouchMove={onTouchMoveHandler}
+      onTouchEnd={onTouchEndHandler}
       width="100px"
       height="100px"
       style={{
